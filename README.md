@@ -49,6 +49,3 @@ kubectl apply -f service.yaml
 
 Este repositório é aberto para estudo e aprendizado.
 
-```
-Quer que eu faça essa versão aprimorada?
-```
