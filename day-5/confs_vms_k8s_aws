@@ -1,34 +1,45 @@
-// #para poder acessar a vm
+// Este documento descreve o passo a passo para preparar máquinas virtuais (VMs) para um cluster Kubernetes.
+
+// 1. Acesso à VM
+
+// Defina permissões seguras para sua chave AWS:
 
 chmod 400 <sua-chave-aws>
 
-// #dentro da vm alterar o nome da maquina
+
+// 2. Alterar hostname da máquina
+
+// Acesse como root e defina um nome identificável para cada node:
 
 sudo su -
-hostnamectl hostname k8s-0* (numero da vm: 1,2,3.)
+hostnamectl set-hostname k8s-0X
 
-// Desativando o uso do swap no sistema
+// > Substitua `X` pelo número da VM (ex: k8s-01, k8s-02, k8s-03)
 
-// Primeiro, vamos desativar a utilização de swap no sistema. 
-// Isso é necessário porque o Kubernetes não trabalha bem com swap ativado:
+
+// 3. Desativar SWAP
+
+// O Kubernetes não funciona corretamente com swap ativado:
 
 sudo swapoff -a
 
-// Carregando os módulos do kernel
 
-// Agora, vamos carregar os módulos do kernel necessários para o funcionamento do Kubernetes:
+// 4. Carregar módulos do kernel
+
+// Crie o arquivo de configuração:
+
 cat <<EOF | sudo tee /etc/modules-load.d/k8s.conf
 overlay
 br_netfilter
 EOF
 
+// Carregue os módulos:
+
 sudo modprobe overlay
 sudo modprobe br_netfilter
 
-// Configurando parâmetros do sistema
 
-// Em seguida, vamos configurar alguns parâmetros do sistema. 
-// Isso garantirá que nosso cluster funcione corretamente:
+// 5. Configurar parâmetros de rede
 
 cat <<EOF | sudo tee /etc/sysctl.d/k8s.conf
 net.bridge.bridge-nf-call-iptables  = 1
@@ -36,29 +47,49 @@ net.bridge.bridge-nf-call-ip6tables = 1
 net.ipv4.ip_forward                 = 1
 EOF
 
+// Aplicar configurações:
+
 sudo sysctl --system
 
-// Instalando os pacotes do Kubernetes
 
-// Hora de instalar os pacotes do Kubernetes! Coisa linda de ai meu Deus! 
-// Aqui vamos nós:
+// 6. Instalar dependências básicas
 
-sudo apt-get update && sudo apt-get install -y apt-transport-https curl
+sudo apt-get update
+sudo apt-get install -y apt-transport-https curl
 
-// esses dois deram ruim pra min, tive que usar o comando abaixo para resolver o problema
-// curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
-// echo "deb https://apt.kubernetes.io/ kubernetes-xenial main" | sudo tee /etc/apt/sources.list.d/kubernetes.list
+// Nota importante
+
+// O repositório antigo do Kubernetes (`apt.kubernetes.io`) foi descontinuado.
+// Use apenas o novo repositório oficial (`pkgs.k8s.io`).
+
+// 7. Adicionar repositório Kubernetes (novo)
+
+// Criar diretório de chaves:
+
 
 sudo mkdir -p /etc/apt/keyrings
 
+// Adicionar chave GPG:
+
 curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.28/deb/Release.key \
   | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+
+
+// Adicionar repositório:
 
 echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] \
 https://pkgs.k8s.io/core:/stable:/v1.28/deb/ /" \
 | sudo tee /etc/apt/sources.list.d/kubernetes.list
 
+
+// 8. Instalar Kubernetes
+
 sudo apt-get update
 sudo apt-get install -y kubelet kubeadm kubectl
 
+
+// 9. Fixar versões (evitar upgrades automáticos)
+
 sudo apt-mark hold kubelet kubeadm kubectl
+
+
